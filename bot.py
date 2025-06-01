@@ -7,6 +7,7 @@ from aiogram.filters import CommandStart
 from langdetect import detect
 import requests
 from dotenv import load_dotenv
+from flask import Flask, jsonify
 
 load_dotenv()
 
@@ -26,6 +27,12 @@ bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher()
 
 blocked_users = set()
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return jsonify({"status": "Bot is running"}), 200
 
 def analyze_content(text: str) -> dict:
     prompt = (
@@ -99,9 +106,19 @@ async def handle_message(message: Message):
 async def start(message: Message):
     await message.answer("Привет! Я бот-модератор. Я буду следить за порядком в чате.")
 
-async def main():
+async def run_bot():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
+    from threading import Thread
     import asyncio
-    asyncio.run(main())
+
+    def run_flask():
+        port = int(os.getenv("PORT", 10000))
+        app.run(host="0.0.0.0", port=port)
+
+    flask_thread = Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+
+    asyncio.run(run_bot())
