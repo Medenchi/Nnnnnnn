@@ -35,6 +35,7 @@ def home():
     return jsonify({"status": "Bot is running"}), 200
 
 def analyze_content(text: str) -> dict:
+    print(f"[DEBUG] Анализируем текст: {text}")
     prompt = (
         "Проанализируй это сообщение на наличие:\n"
         "- Мата или нецензурной лексики\n"
@@ -61,16 +62,24 @@ def analyze_content(text: str) -> dict:
         response = requests.post(OPENROUTER_URL, headers=HEADERS, json=payload)
         result = response.json()
         content = result["choices"][0]["message"]["content"]
-        return eval(content)
+        analysis = eval(content)
+        print(f"[DEBUG] Результат анализа: {analysis}")
+        return analysis
     except Exception as e:
+        print(f"[ERROR] Ошибка при анализе текста: {e}")
         return {"contains_prohibited": False, "reason": "Ошибка анализа", "language": "unknown"}
 
 async def is_admin(chat_id: int, user_id: int) -> bool:
     try:
         member = await bot.get_chat_member(chat_id=chat_id, user_id=user_id)
         return isinstance(member, (ChatMemberOwner, ChatMemberAdministrator))
-    except:
+    except Exception as e:
+        print(f"[ERROR] Не удалось проверить админа: {e}")
         return False
+
+@dp.message()
+async def log_all_messages(message: Message):
+    print(f"[DEBUG] Получено сообщение от {message.from_user.id}: {message.text or '[не текстовое сообщение]'}")
 
 @dp.message(F.text)
 async def handle_message(message: Message):
@@ -78,18 +87,23 @@ async def handle_message(message: Message):
     user_id = message.from_user.id
     text = message.text
 
+    print(f"[INFO] Обработка сообщения от {user_id} в чате {chat_id}: {text}")
+
     if await is_admin(chat_id, user_id):
+        print(f"[INFO] Пользователь {user_id} — администратор. Пропускаем.")
         return
 
     if user_id in blocked_users:
+        print(f"[INFO] Пользователь {user_id} уже заблокирован. Удаляем сообщение.")
         await message.delete()
         return
 
     analysis = analyze_content(text)
 
     if analysis["contains_prohibited"]:
-        await message.delete()
+        print(f"[ACTION] Нарушение найдено. Блокируем пользователя {user_id}. Причина: {analysis['reason']}")
         try:
+            await message.delete()
             await bot.ban_chat_member(chat_id, user_id)
             reason = analysis["reason"]
             lang = analysis["language"]
@@ -100,10 +114,14 @@ async def handle_message(message: Message):
             )
             blocked_users.add(user_id)
         except Exception as e:
+            print(f"[ERROR] Не удалось заблокировать пользователя: {e}")
             await bot.send_message(chat_id, "⚠️ Не удалось заблокировать пользователя.")
+    else:
+        print(f"[INFO] Сообщение безопасно.")
 
 @dp.message(CommandStart())
 async def start(message: Message):
+    print(f"[INFO] Получена команда /start от {message.from_user.id}")
     await message.answer("Привет! Я бот-модератор. Я буду следить за порядком в чате.")
 
 async def run_bot():
@@ -121,4 +139,5 @@ if __name__ == "__main__":
     flask_thread.daemon = True
     flask_thread.start()
 
+    print("[BOOT] Запуск Telegram-бота...")
     asyncio.run(run_bot())
