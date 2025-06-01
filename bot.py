@@ -14,7 +14,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_NAME = "google/gemini-2.0-flash"
+MODEL_NAME = "google/gemini-2.0-flash-exp:free"
 
 HEADERS = {
     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
